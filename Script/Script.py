@@ -17,8 +17,8 @@ EXIT_HOTKEY = keyboard.Key.esc
 DEFAULT_FILE = "macro_minecraft.json"
 HOTKEYS = {RECORD_HOTKEY, PLAY_HOTKEY, SAVE_HOTKEY, LOAD_HOTKEY, EXIT_HOTKEY}
 # Hinweis: Manche Spiele (z. B. Minecraft im Vollbild) reagieren nur auf DirectInput-taugliche Backends.
-# Wenn pyautogui nicht zuverlässig ist, teste USE_PYNPUT_PLAYBACK oder Windows-spezifische Libraries.
-USE_PYNPUT_PLAYBACK = False
+# Wenn pyautogui nicht zuverlässig ist, nutze USE_PYNPUT_PLAYBACK oder Windows-spezifische Libraries.
+USE_PYNPUT_PLAYBACK = True
 
 # Optional: tiny pause reduction to smooth playback
 MIN_SLEEP = 0.0005
@@ -125,6 +125,8 @@ class MacroRecorderPlayer:
         print("[REC] Aufnahme gestartet.")
 
     def stop_recording(self):
+        if not self.recording:
+            return
         self.recording = False
         print(f"[REC] Aufnahme gestoppt. Events: {len(self.events)}")
 
@@ -229,18 +231,6 @@ class MacroRecorderPlayer:
 
     # ---------- Listener Callbacks ----------
     def on_key_press(self, key):
-        if key == EXIT_HOTKEY:
-            # ESC: falls playing -> stop; sonst exit
-            if self.playing:
-                self.stop_play()
-            else:
-                print("[EXIT] Beende...")
-                self.stop_all()
-            return
-
-        if self.ignore_input:
-            return
-
         # Hotkeys global
         if key == RECORD_HOTKEY:
             if not self.recording:
@@ -259,6 +249,17 @@ class MacroRecorderPlayer:
                 self.load_events(DEFAULT_FILE)
             except Exception as e:
                 print(f"[LOAD] Fehler: {e}")
+            return
+        if key == EXIT_HOTKEY:
+            # ESC: falls playing -> stop; sonst exit
+            if self.playing:
+                self.stop_play()
+            else:
+                print("[EXIT] Beende...")
+                self.stop_all()
+            return
+
+        if self.ignore_input:
             return
 
         if key in HOTKEYS:
