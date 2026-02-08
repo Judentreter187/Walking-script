@@ -15,6 +15,9 @@ LOAD_HOTKEY = keyboard.Key.f11
 EXIT_HOTKEY = keyboard.Key.esc
 DEFAULT_FILE = "macro_minecraft.json"
 HOTKEYS = {RECORD_HOTKEY, PLAY_HOTKEY, SAVE_HOTKEY, LOAD_HOTKEY, EXIT_HOTKEY}
+# Hinweis: Manche Spiele (z. B. Minecraft im Vollbild) reagieren nur auf DirectInput-taugliche Backends.
+# Wenn pyautogui nicht zuverlässig ist, teste USE_PYNPUT_PLAYBACK oder Windows-spezifische Libraries.
+USE_PYNPUT_PLAYBACK = False
 
 # Optional: tiny pause reduction to smooth playback
 MIN_SLEEP = 0.0005
@@ -45,6 +48,8 @@ class MacroRecorderPlayer:
 
         self.k_listener: Optional[keyboard.Listener] = None
         self.m_listener: Optional[mouse.Listener] = None
+        self.keyboard_controller = keyboard.Controller()
+        self.mouse_controller = mouse.Controller()
 
         # Beim Abspielen ignorieren wir eingehende Input-Events
         self.ignore_input = False
@@ -80,6 +85,17 @@ class MacroRecorderPlayer:
     def _str_to_button(name: str) -> str:
         # pyautogui nutzt "left"/"right"/"middle"
         return name
+
+    @staticmethod
+    def _str_to_pynput_key(s: str) -> Any:
+        if s.startswith("Key."):
+            key_name = s.replace("Key.", "")
+            return getattr(keyboard.Key, key_name, None) or keyboard.KeyCode.from_char(key_name)
+        return keyboard.KeyCode.from_char(s)
+
+    @staticmethod
+    def _str_to_pynput_button(name: str) -> mouse.Button:
+        return getattr(mouse.Button, name)
 
     def _append_event(self, ev: Event):
         with self.lock:
@@ -149,22 +165,44 @@ class MacroRecorderPlayer:
 
                     if ev.etype == "key_down":
                         key = self._str_to_key(ev.key or "")
-                        pyautogui.keyDown(key)
+                        if USE_PYNPUT_PLAYBACK:
+                            pynput_key = self._str_to_pynput_key(ev.key or "")
+                            self.keyboard_controller.press(pynput_key)
+                        else:
+                            pyautogui.keyDown(key)
                     elif ev.etype == "key_up":
                         key = self._str_to_key(ev.key or "")
-                        pyautogui.keyUp(key)
+                        if USE_PYNPUT_PLAYBACK:
+                            pynput_key = self._str_to_pynput_key(ev.key or "")
+                            self.keyboard_controller.release(pynput_key)
+                        else:
+                            pyautogui.keyUp(key)
                     elif ev.etype == "mouse_move":
                         if ev.x is not None and ev.y is not None:
-                            pyautogui.moveTo(ev.x, ev.y)
+                            if USE_PYNPUT_PLAYBACK:
+                                self.mouse_controller.position = (ev.x, ev.y)
+                            else:
+                                pyautogui.moveTo(ev.x, ev.y)
                     elif ev.etype == "mouse_down":
                         if ev.button and ev.x is not None and ev.y is not None:
-                            pyautogui.mouseDown(x=ev.x, y=ev.y, button=self._str_to_button(ev.button))
+                            if USE_PYNPUT_PLAYBACK:
+                                self.mouse_controller.position = (ev.x, ev.y)
+                                self.mouse_controller.press(self._str_to_pynput_button(ev.button))
+                            else:
+                                pyautogui.mouseDown(x=ev.x, y=ev.y, button=self._str_to_button(ev.button))
                     elif ev.etype == "mouse_up":
                         if ev.button and ev.x is not None and ev.y is not None:
-                            pyautogui.mouseUp(x=ev.x, y=ev.y, button=self._str_to_button(ev.button))
+                            if USE_PYNPUT_PLAYBACK:
+                                self.mouse_controller.position = (ev.x, ev.y)
+                                self.mouse_controller.release(self._str_to_pynput_button(ev.button))
+                            else:
+                                pyautogui.mouseUp(x=ev.x, y=ev.y, button=self._str_to_button(ev.button))
                     elif ev.etype == "scroll":
                         # pyautogui.scroll: positive up, negative down
-                        pyautogui.scroll(ev.dy or 0, x=ev.x, y=ev.y)
+                        if USE_PYNPUT_PLAYBACK:
+                            self.mouse_controller.scroll(ev.dx or 0, ev.dy or 0)
+                        else:
+                            pyautogui.scroll(ev.dy or 0, x=ev.x, y=ev.y)
             finally:
                 self.playing = False
                 self.ignore_input = False
