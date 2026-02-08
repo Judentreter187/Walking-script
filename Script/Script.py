@@ -178,6 +178,15 @@ class MacroRecorderPlayer:
 
     # ---------- Listener Callbacks ----------
     def on_key_press(self, key):
+        if key == EXIT_HOTKEY:
+            # ESC: falls playing -> stop; sonst exit
+            if self.playing:
+                self.stop_play()
+            else:
+                print("[EXIT] Beende...")
+                self.stop_all()
+            return
+
         if self.ignore_input:
             return
 
@@ -199,14 +208,6 @@ class MacroRecorderPlayer:
                 self.load_events(DEFAULT_FILE)
             except Exception as e:
                 print(f"[LOAD] Fehler: {e}")
-            return
-        if key == EXIT_HOTKEY:
-            # ESC: falls playing -> stop; sonst exit
-            if self.playing:
-                self.stop_play()
-            else:
-                print("[EXIT] Beende...")
-                self.stop_all()
             return
 
         if self.recording:
