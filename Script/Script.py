@@ -10,15 +10,15 @@ from pynput import keyboard, mouse
 
 # ===== Einstellungen =====
 RECORD_HOTKEY = keyboard.Key.f8
-PLAY_HOTKEY = keyboard.Key.f9
+PLAY_HOTKEY = keyboard.Key.f12
 SAVE_HOTKEY = keyboard.Key.f10
 LOAD_HOTKEY = keyboard.Key.f11
 EXIT_HOTKEY = keyboard.Key.esc
 DEFAULT_FILE = "macro_minecraft.json"
 HOTKEYS = {RECORD_HOTKEY, PLAY_HOTKEY, SAVE_HOTKEY, LOAD_HOTKEY, EXIT_HOTKEY}
 # Hinweis: Manche Spiele (z. B. Minecraft im Vollbild) reagieren nur auf DirectInput-taugliche Backends.
-# Wenn pyautogui nicht zuverlässig ist, teste USE_PYNPUT_PLAYBACK oder Windows-spezifische Libraries.
-USE_PYNPUT_PLAYBACK = False
+# Wenn pyautogui nicht zuverlässig ist, nutze USE_PYNPUT_PLAYBACK oder Windows-spezifische Libraries.
+USE_PYNPUT_PLAYBACK = True
 
 # Optional: tiny pause reduction to smooth playback
 MIN_SLEEP = 0.0005
@@ -125,6 +125,8 @@ class MacroRecorderPlayer:
         print("[REC] Aufnahme gestartet.")
 
     def stop_recording(self):
+        if not self.recording:
+            return
         self.recording = False
         print(f"[REC] Aufnahme gestoppt. Events: {len(self.events)}")
 
@@ -229,6 +231,28 @@ class MacroRecorderPlayer:
 
     # ---------- Listener Callbacks ----------
     def on_key_press(self, key):
+        # Hotkeys global
+        if key == RECORD_HOTKEY:
+            if not self.recording:
+                self.start_recording()
+            else:
+                self.stop_recording()
+            return
+        if key == PLAY_HOTKEY:
+            if self.playing:
+                self.stop_play()
+            else:
+                self.play()
+            return
+        if key == SAVE_HOTKEY:
+            self.save_events(DEFAULT_FILE)
+            return
+        if key == LOAD_HOTKEY:
+            try:
+                self.load_events(DEFAULT_FILE)
+            except Exception as e:
+                print(f"[LOAD] Fehler: {e}")
+            return
         if key == EXIT_HOTKEY:
             # ESC: falls playing -> stop; sonst exit
             if self.playing:
@@ -239,26 +263,6 @@ class MacroRecorderPlayer:
             return
 
         if self.ignore_input:
-            return
-
-        # Hotkeys global
-        if key == RECORD_HOTKEY:
-            if not self.recording:
-                self.start_recording()
-            else:
-                self.stop_recording()
-            return
-        if key == PLAY_HOTKEY:
-            self.play()
-            return
-        if key == SAVE_HOTKEY:
-            self.save_events(DEFAULT_FILE)
-            return
-        if key == LOAD_HOTKEY:
-            try:
-                self.load_events(DEFAULT_FILE)
-            except Exception as e:
-                print(f"[LOAD] Fehler: {e}")
             return
 
         if key in HOTKEYS:
@@ -314,7 +318,7 @@ class MacroRecorderPlayer:
     def run(self):
         print("=== Macro Recorder/Player ===")
         print("F8  = Aufnahme Start/Stop")
-        print("F9  = Wiedergabe")
+        print("F12 = Wiedergabe Start/Stop")
         print("F10 = Speichern (macro_minecraft.json)")
         print("F11 = Laden (macro_minecraft.json)")
         print("ESC = Wiedergabe stoppen / Beenden")
