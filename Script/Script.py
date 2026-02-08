@@ -14,6 +14,7 @@ SAVE_HOTKEY = keyboard.Key.f10
 LOAD_HOTKEY = keyboard.Key.f11
 EXIT_HOTKEY = keyboard.Key.esc
 DEFAULT_FILE = "macro_minecraft.json"
+HOTKEYS = {RECORD_HOTKEY, PLAY_HOTKEY, SAVE_HOTKEY, LOAD_HOTKEY, EXIT_HOTKEY}
 
 # Optional: tiny pause reduction to smooth playback
 MIN_SLEEP = 0.0005
@@ -210,11 +211,16 @@ class MacroRecorderPlayer:
                 print(f"[LOAD] Fehler: {e}")
             return
 
+        if key in HOTKEYS:
+            return
+
         if self.recording:
             self._append_event(Event(t=self._rel_time(), etype="key_down", key=self._key_to_str(key)))
 
     def on_key_release(self, key):
         if self.ignore_input:
+            return
+        if key in HOTKEYS:
             return
         if self.recording:
             self._append_event(Event(t=self._rel_time(), etype="key_up", key=self._key_to_str(key)))
