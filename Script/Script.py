@@ -5,6 +5,7 @@ from dataclasses import dataclass, asdict
 from typing import Any, Dict, List, Optional, Tuple
 
 import pyautogui
+import tkinter as tk
 from pynput import keyboard, mouse
 
 # ===== Einstellungen =====
@@ -53,6 +54,17 @@ class MacroRecorderPlayer:
 
         # Beim Abspielen ignorieren wir eingehende Input-Events
         self.ignore_input = False
+
+    def event_count(self) -> int:
+        with self.lock:
+            return len(self.events)
+
+    def get_status(self) -> str:
+        if self.recording:
+            return "Recording..."
+        if self.playing:
+            return "Playing..."
+        return "Idle"
 
     # ---------- Hilfsfunktionen ----------
     def _now(self) -> float:
@@ -308,18 +320,7 @@ class MacroRecorderPlayer:
         print("ESC = Wiedergabe stoppen / Beenden")
         print("-----------------------------")
 
-        self.k_listener = keyboard.Listener(
-            on_press=self.on_key_press,
-            on_release=self.on_key_release
-        )
-        self.m_listener = mouse.Listener(
-            on_move=self.on_mouse_move,
-            on_click=self.on_mouse_click,
-            on_scroll=self.on_mouse_scroll
-        )
-
-        self.k_listener.start()
-        self.m_listener.start()
+        self.start_listeners()
 
         # Hauptthread am Leben halten
         try:
@@ -334,6 +335,20 @@ class MacroRecorderPlayer:
         finally:
             self.stop_all()
 
+    def start_listeners(self):
+        self.k_listener = keyboard.Listener(
+            on_press=self.on_key_press,
+            on_release=self.on_key_release
+        )
+        self.m_listener = mouse.Listener(
+            on_move=self.on_mouse_move,
+            on_click=self.on_mouse_click,
+            on_scroll=self.on_mouse_scroll
+        )
+
+        self.k_listener.start()
+        self.m_listener.start()
+
     def stop_all(self):
         self.recording = False
         self.playing = False
@@ -344,5 +359,67 @@ class MacroRecorderPlayer:
             self.m_listener.stop()
 
 
+class MacroRecorderUI:
+    def __init__(self, recorder: MacroRecorderPlayer):
+        self.recorder = recorder
+        self.root = tk.Tk()
+        self.root.title("Macro Recorder")
+        self.status_var = tk.StringVar(value="Idle")
+        self.details_var = tk.StringVar(value="Events: 0")
+
+        status_label = tk.Label(self.root, textvariable=self.status_var, font=("Arial", 14))
+        status_label.pack(pady=(10, 2))
+        details_label = tk.Label(self.root, textvariable=self.details_var)
+        details_label.pack(pady=(0, 10))
+
+        button_frame = tk.Frame(self.root)
+        button_frame.pack(padx=10, pady=10)
+
+        tk.Button(button_frame, text="Start Recording", width=18, command=self.start_recording).grid(row=0, column=0, padx=5, pady=5)
+        tk.Button(button_frame, text="Stop Recording", width=18, command=self.stop_recording).grid(row=0, column=1, padx=5, pady=5)
+        tk.Button(button_frame, text="Play", width=18, command=self.play).grid(row=1, column=0, padx=5, pady=5)
+        tk.Button(button_frame, text="Stop Play", width=18, command=self.stop_play).grid(row=1, column=1, padx=5, pady=5)
+        tk.Button(button_frame, text="Save", width=18, command=self.save).grid(row=2, column=0, padx=5, pady=5)
+        tk.Button(button_frame, text="Load", width=18, command=self.load).grid(row=2, column=1, padx=5, pady=5)
+        tk.Button(button_frame, text="Exit", width=38, command=self.close).grid(row=3, column=0, columnspan=2, padx=5, pady=(10, 5))
+
+        self.root.protocol("WM_DELETE_WINDOW", self.close)
+        self.recorder.start_listeners()
+        self.refresh_status()
+
+    def refresh_status(self):
+        self.status_var.set(self.recorder.get_status())
+        self.details_var.set(f"Events: {self.recorder.event_count()}")
+        self.root.after(200, self.refresh_status)
+
+    def start_recording(self):
+        self.recorder.start_recording()
+
+    def stop_recording(self):
+        self.recorder.stop_recording()
+
+    def play(self):
+        self.recorder.play()
+
+    def stop_play(self):
+        self.recorder.stop_play()
+
+    def save(self):
+        self.recorder.save_events(DEFAULT_FILE)
+
+    def load(self):
+        try:
+            self.recorder.load_events(DEFAULT_FILE)
+        except Exception as e:
+            print(f"[LOAD] Fehler: {e}")
+
+    def close(self):
+        self.recorder.stop_all()
+        self.root.destroy()
+
+    def run(self):
+        self.root.mainloop()
+
+
 if __name__ == "__main__":
-    MacroRecorderPlayer().run()
+    MacroRecorderUI(MacroRecorderPlayer()).run()
